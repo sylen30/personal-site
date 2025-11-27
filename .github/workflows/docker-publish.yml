@@ -71,7 +71,6 @@ jobs:
               --name personal-site \
               --restart unless-stopped \
               -p 80:80 \
-              -e APP_KEY='${{ secrets.APP_KEY }}' \
               -e APP_ENV=production \
               -e APP_DEBUG=true \
               -e APP_URL=http://${{ secrets.VPS_HOST }} \
@@ -80,5 +79,9 @@ jobs:
             # Prune old images to save space
             docker image prune -f
 
+            # Generate app key
+            docker exec personal-site php artisan key:generate --force
+
             # Run migrations
             docker exec personal-site php artisan migrate --force
+
