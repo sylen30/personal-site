@@ -79,3 +79,6 @@ jobs:
             
             # Prune old images to save space
             docker image prune -f
+
+            # Run migrations
+            docker exec personal-site php artisan migrate --force
