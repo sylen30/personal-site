@@ -43,3 +43,35 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            # Login to GHCR (using the PAT)
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Pull the new image
+            docker pull ghcr.io/${{ github.repository }}:latest
+            
+            # Stop and remove the old container (if it exists)
+            docker stop personal-site || true
+            docker rm personal-site || true
+            
+            # Run the new container
+            # Using --restart unless-stopped to ensure it comes back up on reboot
+            docker run -d \
+              --name personal-site \
+              --restart unless-stopped \
+              -p 80:80 \
+              ghcr.io/${{ github.repository }}:latest
+            
+            # Prune old images to save space
+            docker image prune -f
