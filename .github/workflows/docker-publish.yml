@@ -45,6 +45,10 @@ jobs:
             # Generate app key
             docker exec personal-site php artisan key:generate --force
 
+            # Fix storage permissions
+            docker exec personal-site chmod -R 775 /var/www/html/storage
+            docker exec personal-site chown -R www-data:www-data /var/www/html/storage
+
             # Run migrations
             docker exec personal-site php artisan migrate --force
 
