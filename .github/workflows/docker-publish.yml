@@ -24,9 +24,28 @@ jobs:
             # Pull the new image
             docker pull ghcr.io/${{ github.repository }}:latest
             
-            # Stop and remove the old container (if it exists)
+            # Find and stop ANY container using port 80
+            echo "Checking for containers using port 80..."
+            CONTAINER_ON_80=$(docker ps --format '{{.ID}}' --filter "publish=80")
+            if [ ! -z "$CONTAINER_ON_80" ]; then
+              echo "Found container(s) using port 80: $CONTAINER_ON_80"
+              docker stop $CONTAINER_ON_80 || true
+              docker rm $CONTAINER_ON_80 || true
+            fi
+            
+            # Also explicitly stop and remove personal-site by name
             docker stop personal-site || true
             docker rm personal-site || true
+            
+            # Check if port 80 is still in use by a system process
+            if lsof -i :80 >/dev/null 2>&1; then
+              echo "WARNING: Port 80 is still in use by a system process:"
+              lsof -i :80 || true
+              echo "You may need to stop nginx/apache or other services manually"
+            fi
+            
+            # Wait a moment for port to be released
+            sleep 2
             
             # Run the new container
             # Using --restart unless-stopped to ensure it comes back up on reboot
@@ -42,6 +61,9 @@ jobs:
             # Prune old images to save space
             docker image prune -f
 
+            # Wait for container to be ready
+            sleep 3
+
             # Create .env file from example
             docker exec personal-site cp .env.example .env
 
@@ -54,4 +76,3 @@ jobs:
 
             # Run migrations
             docker exec personal-site php artisan migrate --force
-
