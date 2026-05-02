@@ -44,9 +44,7 @@ jobs:
           VITE_GOOGLE_3D_TILES_KEY: ${{ secrets.GOOGLE_3D_TILES_KEY }}
         run: npm run build
 
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      - uses: actions/configure-pages@v4
 
       - uses: actions/upload-pages-artifact@v3
         with:
