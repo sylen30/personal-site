@@ -1,10 +1,10 @@
 import type { Aircraft } from '../types';
 
-// ADS-B Exchange globe API — same receiver network as FlightRadar24, wider
-// than adsb.fi, community-run with no ToS restrictions on public data.
-// Falls back to adsb.fi if ADSBX is unreachable.
-const ADSBX_URL = 'https://globe.adsbexchange.com/re-api/?all';
-const ADSBFI_URL = 'https://api.adsb.fi/v1/flights';
+// adsb.lol — CORS-open community ADS-B feed, ADSBExchange v2-compatible format.
+// Falls back to opendata.adsb.fi snapshot (also CORS-open, refreshed every 30s).
+// Both return {"ac": [...]} with the same field names our mapper already handles.
+const ADSBX_URL = 'https://api.adsb.lol/v2/all';
+const ADSBFI_URL = 'https://opendata.adsb.fi/api/v2/snapshot';
 
 interface AircraftRecord {
   hex: string;
