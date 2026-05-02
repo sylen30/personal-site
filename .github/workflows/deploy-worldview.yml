@@ -1,4 +1,5 @@
 name: Deploy WorldView to GitHub Pages
+# Retrigger after environment protection rules were updated to allow this branch.
 
 on:
   push:
