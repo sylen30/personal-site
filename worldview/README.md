@@ -32,12 +32,34 @@ run, your site will be at `https://<user>.github.io/personal-site/`.
 
 One-time setup:
 1. Repo → Settings → Pages → Source: **GitHub Actions**.
-2. (Optional) Repo → Settings → Secrets → Actions, add:
-   - `CESIUM_ION_TOKEN` — better basemap
-   - `AISSTREAM_API_KEY` — enables the Ships layer
-   - `GOOGLE_3D_TILES_KEY` — Photorealistic 3D Tiles
+2. Deploy the flights proxy (see below) and grab its URL.
+3. Repo → Settings → Secrets → Actions → **New repository secret**:
+   - `VITE_FLIGHTS_PROXY_URL` — Cloudflare Worker URL (**required for Flights layer**)
+   - `VITE_CESIUM_ION_TOKEN` — better basemap (optional)
+   - `VITE_AISSTREAM_API_KEY` — enables the Ships layer (optional)
+   - `VITE_GOOGLE_3D_TILES_KEY` — Photorealistic 3D Tiles (optional)
 
-Without secrets it still builds and runs (free fallback imagery).
+Without secrets it still builds and the globe renders (satellites + earthquakes
+work without a proxy because USGS and CelesTrak set `Access-Control-Allow-Origin: *`).
+
+### Flights Proxy (Cloudflare Worker)
+
+All public ADS-B REST APIs block CORS from `github.io`. The included worker
+adds the missing headers and handles upstream fallback server-side.
+
+```bash
+npm install -g wrangler          # Cloudflare CLI (one-time)
+wrangler login                   # opens browser auth
+cd worldview/flights-proxy
+wrangler deploy                  # deploys in ~10s, prints the worker URL
+```
+
+Free Cloudflare account gets 100,000 requests/day — more than enough for a
+personal site polling every 10 seconds.
+
+Copy the printed URL (e.g. `https://worldview-flights.yourname.workers.dev`)
+and add it as `VITE_FLIGHTS_PROXY_URL` in the GitHub secret above, then
+re-run the Pages workflow. Flights will appear within one poll cycle.
 
 ### Vercel
 
@@ -59,12 +81,13 @@ All keys are optional — the app degrades gracefully when they're missing.
 
 | Var | What it unlocks | Where to get it |
 |---|---|---|
-| `VITE_CESIUM_ION_TOKEN` | Cesium World Imagery basemap (much prettier than the offline blue-marble fallback) | https://ion.cesium.com/tokens (free signup) |
-| `VITE_AISSTREAM_API_KEY` | Live ship tracking via the AIS WebSocket | https://aisstream.io/authenticate (free) |
-| `VITE_GOOGLE_3D_TILES_KEY` | Photorealistic 3D Tiles (the same volumetric city data Google Earth uses) | https://developers.google.com/maps/documentation/tile/get-api-key |
+| `VITE_FLIGHTS_PROXY_URL` | **Flights layer** (required on static hosts — all ADS-B APIs block CORS) | Deploy `worldview/flights-proxy/` — see above |
+| `VITE_CESIUM_ION_TOKEN` | Cesium World Imagery basemap | https://ion.cesium.com/tokens (free) |
+| `VITE_AISSTREAM_API_KEY` | Live ship tracking via AIS WebSocket | https://aisstream.io/authenticate (free) |
+| `VITE_GOOGLE_3D_TILES_KEY` | Photorealistic 3D Tiles | https://developers.google.com/maps/documentation/tile/get-api-key |
 
-Without any keys you still get: the globe, flights (OpenSky), satellites
-(CelesTrak), and earthquakes (USGS).
+Without any keys: the globe renders, satellites (CelesTrak) and earthquakes
+(USGS) work fine. Flights need the proxy.
 
 ## Data sources
 

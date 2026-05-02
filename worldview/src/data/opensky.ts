@@ -1,10 +1,17 @@
 import type { Aircraft } from '../types';
 
-// adsb.lol — CORS-open community ADS-B feed, ADSBExchange v2-compatible format.
-// Falls back to opendata.adsb.fi snapshot (also CORS-open, refreshed every 30s).
-// Both return {"ac": [...]} with the same field names our mapper already handles.
-const ADSBX_URL = 'https://api.adsb.lol/v2/all';
-const ADSBFI_URL = 'https://opendata.adsb.fi/api/v2/snapshot';
+// If VITE_FLIGHTS_PROXY_URL is set (e.g. a Cloudflare Worker), use it as the
+// sole source — the worker handles CORS and upstream fallback server-side.
+// Without it, direct API calls are attempted, which only works in local dev
+// (all public ADS-B APIs block CORS from github.io).
+const PROXY_URL = (import.meta.env.VITE_FLIGHTS_PROXY_URL as string | undefined)?.replace(/\/$/, '');
+
+const SOURCES: string[] = PROXY_URL
+  ? [PROXY_URL]
+  : [
+      'https://api.adsb.lol/v2/aircraft',
+      'https://opendata.adsb.fi/api/v2/snapshot',
+    ];
 
 interface AircraftRecord {
   hex: string;
@@ -41,13 +48,12 @@ function mapRecord(a: AircraftRecord): Aircraft | null {
 let lastResult: Aircraft[] = [];
 
 export async function fetchAircraftStates(): Promise<Aircraft[]> {
-  // Try ADS-B Exchange first (denser coverage), fall back to adsb.fi.
-  for (const url of [ADSBX_URL, ADSBFI_URL]) {
+  for (const url of SOURCES) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
       if (!res.ok) continue;
       const json = (await res.json()) as Record<string, unknown>;
-      // ADSBX uses "ac", adsb.fi uses "aircraft"
+      // Handles "ac" (ADSBX/adsb.lol format) and "aircraft" (adsb.fi legacy)
       const raw = (json['ac'] ?? json['aircraft']) as AircraftRecord[] | undefined;
       if (!Array.isArray(raw) || raw.length === 0) continue;
       const aircraft = raw.flatMap((a) => {
@@ -62,7 +68,11 @@ export async function fetchAircraftStates(): Promise<Aircraft[]> {
       // network / CORS / timeout — try next source
     }
   }
-  console.warn('[flights] All sources failed, returning last known state');
+  if (!PROXY_URL) {
+    console.warn('[flights] No VITE_FLIGHTS_PROXY_URL set — direct API calls are CORS-blocked on github.io. Deploy the Cloudflare Worker in worldview/flights-proxy/ and set the env var.');
+  } else {
+    console.warn('[flights] Proxy fetch failed, returning last known state');
+  }
   return lastResult;
 }
 
