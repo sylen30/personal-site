@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Ion,
   Viewer as CesiumViewer,
@@ -13,7 +13,7 @@ import {
   createWorldImageryAsync,
   Math as CesiumMath,
 } from 'cesium';
-import { Viewer } from 'resium';
+import { Viewer, useCesium } from 'resium';
 import { useLayerStore } from '../store/layers';
 import { useClockStore } from './TimeScrubber';
 import { FlightsLayer } from '../layers/FlightsLayer';
@@ -36,45 +36,46 @@ function osmLayer(): ImageryLayer {
   );
 }
 
-export function GlobeView() {
-  const viewerRef = useRef<{ cesiumElement?: CesiumViewer }>(null);
-  const [ready, setReady] = useState(false);
-  const [renderError, setRenderError] = useState<string | null>(null);
+// ─── Inner component: runs inside <Viewer> so useCesium() is always ready ────
+
+interface SetupProps {
+  onReady: (v: CesiumViewer) => void;
+  onError: (msg: string) => void;
+}
+
+function ViewerSetup({ onReady, onError }: SetupProps) {
+  // useCesium() gives us the viewer from Resium's context — guaranteed
+  // non-null by the time this component's effects run.
+  const { viewer } = useCesium();
+  const initialized = useRef(false);
   const clockMultiplier = useClockStore((s) => s.multiplier);
   const clockPaused = useClockStore((s) => s.paused);
 
   useEffect(() => {
-    const viewer = viewerRef.current?.cesiumElement;
-    if (!viewer) return;
+    if (!viewer || initialized.current) return;
+    initialized.current = true;
 
-    // Surface Cesium render errors on-screen.
-    const removeErrorListener = viewer.scene.renderError.addEventListener(
-      (_scene: unknown, error: unknown) => {
-        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-        console.error('[WorldView] Cesium render error:', error);
-        setRenderError(msg);
-      },
-    );
+    viewer.scene.renderError.addEventListener((_scene: unknown, error: unknown) => {
+      const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      console.error('[WorldView] render error:', error);
+      onError(msg);
+    });
 
-    // Flat ellipsoid — no Ion token required.
+    // Flat ellipsoid terrain — no Ion token required.
     viewer.terrainProvider = new EllipsoidTerrainProvider();
 
-    // Optional scene enhancements — wrapped so any failure stays non-fatal.
     try {
       viewer.scene.fog.enabled = true;
-      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
 
-    // Imagery — use ImageryLayer constructor (addImageryProvider removed in Cesium 1.125+).
+    // Imagery using the current Cesium ImageryLayer API.
     viewer.imageryLayers.removeAll();
     if (ION_TOKEN) {
       createWorldImageryAsync()
-        .then((provider) => {
+        .then((p) => {
           if (!viewer.isDestroyed()) {
             viewer.imageryLayers.removeAll();
-            viewer.imageryLayers.add(new ImageryLayer(provider));
+            viewer.imageryLayers.add(new ImageryLayer(p));
           }
         })
         .catch(() => {
@@ -92,7 +93,7 @@ export function GlobeView() {
         `https://tile.googleapis.com/v1/3dtiles/root.json?key=${GOOGLE_3D_KEY}`,
         { showCreditsOnScreen: false },
       )
-        .then((tileset) => { if (!viewer.isDestroyed()) viewer.scene.primitives.add(tileset); })
+        .then((t) => { if (!viewer.isDestroyed()) viewer.scene.primitives.add(t); })
         .catch((e) => console.warn('[WorldView] 3D Tiles:', e));
     }
 
@@ -121,25 +122,36 @@ export function GlobeView() {
       useLayerStore.getState().setSelected(fromId ?? fromPrim ?? null);
     }, ScreenSpaceEventType.LEFT_CLICK);
 
-    setReady(true);
+    onReady(viewer);
 
     return () => {
       handler.destroy();
-      if (typeof removeErrorListener === 'function') removeErrorListener();
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewer]);
 
+  // Sync clock multiplier to Cesium viewer.
   useEffect(() => {
-    const viewer = viewerRef.current?.cesiumElement;
     if (!viewer) return;
     viewer.clock.multiplier = clockMultiplier;
     viewer.clock.shouldAnimate = !clockPaused;
-  }, [clockMultiplier, clockPaused, ready]);
+  }, [viewer, clockMultiplier, clockPaused]);
+
+  return null;
+}
+
+// ─── Outer shell ─────────────────────────────────────────────────────────────
+
+export function GlobeView() {
+  const [activeViewer, setActiveViewer] = useState<CesiumViewer | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
+
+  const handleReady = useCallback((v: CesiumViewer) => setActiveViewer(v), []);
+  const handleError = useCallback((msg: string) => setRenderError(msg), []);
 
   return (
     <div className="absolute inset-0">
       <Viewer
-        ref={viewerRef}
         full
         animation={false}
         timeline={false}
@@ -154,12 +166,13 @@ export function GlobeView() {
         selectionIndicator={false}
         shouldAnimate={true}
       >
-        {ready && viewerRef.current?.cesiumElement && (
+        <ViewerSetup onReady={handleReady} onError={handleError} />
+        {activeViewer && (
           <>
-            <FlightsLayer viewer={viewerRef.current.cesiumElement} />
-            <ShipsLayer viewer={viewerRef.current.cesiumElement} />
-            <SatellitesLayer viewer={viewerRef.current.cesiumElement} />
-            <EarthquakesLayer viewer={viewerRef.current.cesiumElement} />
+            <FlightsLayer viewer={activeViewer} />
+            <ShipsLayer viewer={activeViewer} />
+            <SatellitesLayer viewer={activeViewer} />
+            <EarthquakesLayer viewer={activeViewer} />
           </>
         )}
       </Viewer>
