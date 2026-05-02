@@ -5,7 +5,8 @@ import {
   Cesium3DTileset,
   Cartesian3,
   Cartesian2,
-  OpenStreetMapImageryProvider,
+  EllipsoidTerrainProvider,
+  UrlTemplateImageryProvider,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   createWorldImageryAsync,
@@ -55,8 +56,9 @@ export function GlobeView() {
         .catch((err) => {
           console.warn('[WorldView] Cesium World Imagery failed, using OSM:', err);
           viewer.imageryLayers.addImageryProvider(
-            new OpenStreetMapImageryProvider({
-              url: 'https://tile.openstreetmap.org/',
+            new UrlTemplateImageryProvider({
+              url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              credit: '© OpenStreetMap contributors',
             }),
           );
         });
@@ -74,10 +76,11 @@ export function GlobeView() {
           });
       }
     } else {
-      // No Ion token — OpenStreetMap tiles need no auth and work everywhere.
+      // No Ion token — OSM tiles need no auth and work everywhere.
       viewer.imageryLayers.addImageryProvider(
-        new OpenStreetMapImageryProvider({
-          url: 'https://tile.openstreetmap.org/',
+        new UrlTemplateImageryProvider({
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          credit: '© OpenStreetMap contributors',
         }),
       );
     }
@@ -139,6 +142,7 @@ export function GlobeView() {
         animation={false}
         timeline={false}
         baseLayer={false}
+        terrainProvider={new EllipsoidTerrainProvider()}
         baseLayerPicker={false}
         geocoder={false}
         homeButton={false}
