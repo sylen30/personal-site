@@ -6,6 +6,7 @@ import {
   Cartesian3,
   Cartesian2,
   EllipsoidTerrainProvider,
+  ImageryLayer,
   UrlTemplateImageryProvider,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
@@ -23,15 +24,17 @@ import { EarthquakesLayer } from '../layers/EarthquakesLayer';
 const ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN as string | undefined;
 const GOOGLE_3D_KEY = import.meta.env.VITE_GOOGLE_3D_TILES_KEY as string | undefined;
 
-if (ION_TOKEN) {
-  Ion.defaultAccessToken = ION_TOKEN;
-}
+if (ION_TOKEN) Ion.defaultAccessToken = ION_TOKEN;
 
-const OSM_PROVIDER = new UrlTemplateImageryProvider({
-  url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  credit: '© OpenStreetMap contributors',
-  maximumLevel: 19,
-});
+function osmLayer(): ImageryLayer {
+  return new ImageryLayer(
+    new UrlTemplateImageryProvider({
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      credit: '© OpenStreetMap contributors',
+      maximumLevel: 19,
+    }),
+  );
+}
 
 export function GlobeView() {
   const viewerRef = useRef<{ cesiumElement?: CesiumViewer }>(null);
@@ -44,41 +47,44 @@ export function GlobeView() {
     const viewer = viewerRef.current?.cesiumElement;
     if (!viewer) return;
 
-    // Surface the actual Cesium render error so it's visible on-screen.
-    const errorCleanup = viewer.scene.renderError.addEventListener(
+    // Surface Cesium render errors on-screen.
+    const removeErrorListener = viewer.scene.renderError.addEventListener(
       (_scene: unknown, error: unknown) => {
-        const msg =
-          error instanceof Error
-            ? `${error.name}: ${error.message}`
-            : String(error);
+        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
         console.error('[WorldView] Cesium render error:', error);
         setRenderError(msg);
       },
     );
 
-    // Force flat-ellipsoid terrain — no Ion token needed.
+    // Flat ellipsoid — no Ion token required.
     viewer.terrainProvider = new EllipsoidTerrainProvider();
 
+    // Optional scene enhancements — wrapped so any failure stays non-fatal.
     try {
-      viewer.scene.globe.enableLighting = false; // lighting needs atmosphere, skip for safety
-      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
       viewer.scene.fog.enabled = true;
-    } catch (e) {
-      console.warn('[WorldView] Scene setup warning:', e);
+      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
+    } catch {
+      // ignore
     }
 
-    // Imagery — OSM always works; Cesium World Imagery if token present.
+    // Imagery — use ImageryLayer constructor (addImageryProvider removed in Cesium 1.125+).
     viewer.imageryLayers.removeAll();
     if (ION_TOKEN) {
       createWorldImageryAsync()
         .then((provider) => {
-          if (!viewer.isDestroyed()) viewer.imageryLayers.addImageryProvider(provider);
+          if (!viewer.isDestroyed()) {
+            viewer.imageryLayers.removeAll();
+            viewer.imageryLayers.add(new ImageryLayer(provider));
+          }
         })
         .catch(() => {
-          if (!viewer.isDestroyed()) viewer.imageryLayers.addImageryProvider(OSM_PROVIDER);
+          if (!viewer.isDestroyed()) {
+            viewer.imageryLayers.removeAll();
+            viewer.imageryLayers.add(osmLayer());
+          }
         });
     } else {
-      viewer.imageryLayers.addImageryProvider(OSM_PROVIDER);
+      viewer.imageryLayers.add(osmLayer());
     }
 
     if (GOOGLE_3D_KEY) {
@@ -86,10 +92,8 @@ export function GlobeView() {
         `https://tile.googleapis.com/v1/3dtiles/root.json?key=${GOOGLE_3D_KEY}`,
         { showCreditsOnScreen: false },
       )
-        .then((tileset) => {
-          if (!viewer.isDestroyed()) viewer.scene.primitives.add(tileset);
-        })
-        .catch((err) => console.warn('[WorldView] 3D Tiles failed:', err));
+        .then((tileset) => { if (!viewer.isDestroyed()) viewer.scene.primitives.add(tileset); })
+        .catch((e) => console.warn('[WorldView] 3D Tiles:', e));
     }
 
     viewer.camera.flyTo({
@@ -118,9 +122,10 @@ export function GlobeView() {
     }, ScreenSpaceEventType.LEFT_CLICK);
 
     setReady(true);
+
     return () => {
       handler.destroy();
-      errorCleanup();
+      if (typeof removeErrorListener === 'function') removeErrorListener();
     };
   }, []);
 
@@ -163,11 +168,7 @@ export function GlobeView() {
         <div className="absolute inset-x-4 top-24 z-50 rounded-md border border-red-500/60 bg-black/90 p-4 text-xs text-red-300 font-mono">
           <div className="mb-1 text-red-400 uppercase tracking-widest text-[10px]">Cesium Render Error</div>
           <div className="break-all">{renderError}</div>
-          <button
-            type="button"
-            onClick={() => setRenderError(null)}
-            className="mt-2 text-red-500 hover:text-red-300"
-          >
+          <button type="button" onClick={() => setRenderError(null)} className="mt-2 text-red-500 hover:text-red-300">
             dismiss
           </button>
         </div>
