@@ -1,9 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { viteStaticCopy } from 'vite-plugin-static-copy';
 
-const cesiumSource = 'node_modules/cesium/Build/Cesium';
+// Cesium static assets (workers, textures, skybox, etc.) are served from the
+// jsDelivr CDN matching the exact installed version. This avoids copying
+// hundreds of files during build and eliminates GH Pages asset 404s entirely.
+const cesiumVersion = '1.141.0';
+const CESIUM_BASE_URL = `https://cdn.jsdelivr.net/npm/cesium@${cesiumVersion}/Build/Cesium/`;
 
 // BASE_PATH is set by the GitHub Pages workflow to '/personal-site/'.
 // Vercel/Netlify/local dev all use '/'.
@@ -14,17 +17,9 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    viteStaticCopy({
-      targets: [
-        { src: `${cesiumSource}/Workers`, dest: 'cesium' },
-        { src: `${cesiumSource}/ThirdParty`, dest: 'cesium' },
-        { src: `${cesiumSource}/Assets`, dest: 'cesium' },
-        { src: `${cesiumSource}/Widgets`, dest: 'cesium' },
-      ],
-    }),
   ],
   define: {
-    CESIUM_BASE_URL: JSON.stringify(`${basePath}cesium/`),
+    CESIUM_BASE_URL: JSON.stringify(CESIUM_BASE_URL),
   },
   server: {
     port: 5173,
