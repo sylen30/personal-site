@@ -1,68 +1,63 @@
 import type { Aircraft } from '../types';
 
-const OPENSKY_URL = 'https://opensky-network.org/api/states/all';
+// adsb.fi — free, CORS-enabled, no auth required, global coverage.
+// OpenSky blocks anonymous browser requests via CORS on most origins.
+const ADSBFI_URL = 'https://api.adsb.fi/v1/flights';
 
-type RawState = [
-  string, // icao24
-  string | null, // callsign
-  string, // origin_country
-  number | null, // time_position
-  number, // last_contact
-  number | null, // longitude
-  number | null, // latitude
-  number | null, // baro_altitude
-  boolean, // on_ground
-  number | null, // velocity
-  number | null, // true_track
-  number | null, // vertical_rate
-  number[] | null, // sensors
-  number | null, // geo_altitude
-  string | null, // squawk
-  boolean, // spi
-  number, // position_source
-];
+interface AdsbFiAircraft {
+  hex: string;
+  flight?: string;
+  lat?: number;
+  lon?: number;
+  alt_baro?: number | 'ground';
+  track?: number;
+  gs?: number;
+  vert_rate?: number;
+  seen?: number;
+  r?: string;  // registration
+  t?: string;  // aircraft type
+}
 
-interface OpenSkyResponse {
-  time: number;
-  states: RawState[] | null;
+interface AdsbFiResponse {
+  aircraft: AdsbFiAircraft[];
 }
 
 let lastResult: Aircraft[] = [];
 
 export async function fetchAircraftStates(): Promise<Aircraft[]> {
   try {
-    const res = await fetch(OPENSKY_URL);
+    const res = await fetch(ADSBFI_URL);
     if (!res.ok) {
-      console.error(`OpenSky fetch failed: ${res.status} ${res.statusText}`);
+      console.error(`adsb.fi fetch failed: ${res.status} ${res.statusText}`);
       return lastResult;
     }
-    const json = (await res.json()) as OpenSkyResponse;
-    const states = json.states ?? [];
+    const json = (await res.json()) as AdsbFiResponse;
     const aircraft: Aircraft[] = [];
-    for (const s of states) {
-      const longitude = s[5];
-      const latitude = s[6];
-      if (longitude == null || latitude == null) continue;
-      const callsignRaw = s[1];
-      const callsign = callsignRaw ? callsignRaw.trim() || null : null;
+    for (const a of json.aircraft ?? []) {
+      if (a.lat == null || a.lon == null) continue;
+      const onGround = a.alt_baro === 'ground';
+      const altFt = onGround || a.alt_baro == null ? null : (a.alt_baro as number);
+      const altM = altFt != null ? altFt * 0.3048 : null;
+      const velocityMs = a.gs != null ? a.gs * 0.514444 : null;
+      const vertMs = a.vert_rate != null ? a.vert_rate * 0.00508 : null;
       aircraft.push({
-        icao24: s[0],
-        callsign,
-        originCountry: s[2],
-        longitude,
-        latitude,
-        baroAltitudeM: s[7],
-        velocityMs: s[9],
-        trueTrackDeg: s[10],
-        verticalRateMs: s[11],
-        onGround: s[8],
-        lastContactSec: s[4],
+        icao24: a.hex,
+        callsign: a.flight?.trim() || null,
+        originCountry: a.r ?? '',
+        longitude: a.lon,
+        latitude: a.lat,
+        baroAltitudeM: altM,
+        velocityMs,
+        trueTrackDeg: a.track ?? null,
+        verticalRateMs: vertMs,
+        onGround,
+        lastContactSec: a.seen ?? 0,
       });
     }
     lastResult = aircraft;
     return aircraft;
   } catch (err) {
-    console.error('OpenSky fetch error:', err);
+    console.error('adsb.fi fetch error:', err);
     return lastResult;
   }
 }
