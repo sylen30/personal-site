@@ -5,7 +5,12 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 const cesiumSource = 'node_modules/cesium/Build/Cesium';
 
+// BASE_PATH is set by the GitHub Pages workflow to '/personal-site/'.
+// Vercel/Netlify/local dev all use '/'.
+const basePath = process.env.BASE_PATH ?? '/';
+
 export default defineConfig({
+  base: basePath,
   plugins: [
     react(),
     tailwindcss(),
@@ -19,9 +24,10 @@ export default defineConfig({
     }),
   ],
   define: {
-    CESIUM_BASE_URL: JSON.stringify('/cesium/'),
+    CESIUM_BASE_URL: JSON.stringify(`${basePath}cesium/`),
   },
   server: {
     port: 5173,
+    host: true,
   },
 });

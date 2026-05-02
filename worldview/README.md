@@ -14,6 +14,45 @@ npm install
 npm run dev                # http://localhost:5173
 ```
 
+### View on phone
+
+- **Same Wi-Fi**: `npm run dev` then open `http://<your-laptop-ip>:5173` on
+  your phone (Vite already binds to `0.0.0.0`).
+- **Public URL via tunnel** (works on cellular too):
+  `npx cloudflared tunnel --url http://localhost:5173`
+- **Permanent URL**: see Deploy below.
+
+## Deploy
+
+### GitHub Pages (auto on push)
+
+A workflow at `.github/workflows/deploy-worldview.yml` builds and deploys to
+GitHub Pages on every push to `main` or this feature branch. After the first
+run, your site will be at `https://<user>.github.io/personal-site/`.
+
+One-time setup:
+1. Repo → Settings → Pages → Source: **GitHub Actions**.
+2. (Optional) Repo → Settings → Secrets → Actions, add:
+   - `CESIUM_ION_TOKEN` — better basemap
+   - `AISSTREAM_API_KEY` — enables the Ships layer
+   - `GOOGLE_3D_TILES_KEY` — Photorealistic 3D Tiles
+
+Without secrets it still builds and runs (free fallback imagery).
+
+### Vercel
+
+Import the repo at https://vercel.com/new, set **Root Directory** to
+`worldview`. The included `vercel.json` handles the rest. Add env vars in
+Project Settings → Environment Variables (use the `VITE_*` names from
+`.env.example`).
+
+### Netlify
+
+Drag `worldview/dist/` to https://app.netlify.com/drop after a local
+`npm run build`, or connect the repo — `netlify.toml` already configures
+`base = "worldview"`. Add env vars under Site → Configuration →
+Environment variables.
+
 ## API Keys
 
 All keys are optional — the app degrades gracefully when they're missing.
