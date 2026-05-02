@@ -1,0 +1,119 @@
+@import 'tailwindcss';
+@import 'cesium/Build/Cesium/Widgets/widgets.css';
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  background: #000;
+  color: #6ee7b7;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Cesium overrides — dark tactical theme */
+.cesium-viewer-bottom,
+.cesium-widget-credits {
+  display: none !important;
+}
+
+.cesium-viewer {
+  background: #000 !important;
+}
+
+.cesium-widget canvas {
+  outline: none;
+}
+
+/* Glowing tactical panel base */
+.tactical-panel {
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid rgba(110, 231, 183, 0.35);
+  box-shadow: 0 0 24px rgba(34, 197, 94, 0.08), inset 0 0 0 1px rgba(110, 231, 183, 0.05);
+  backdrop-filter: blur(6px);
+}
+
+.tactical-divider {
+  border-color: rgba(110, 231, 183, 0.18);
+}
+
+/* Switch styling */
+.tactical-switch {
+  appearance: none;
+  width: 32px;
+  height: 16px;
+  background: rgba(110, 231, 183, 0.12);
+  border: 1px solid rgba(110, 231, 183, 0.4);
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tactical-switch::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  background: #6ee7b7;
+  border-radius: 50%;
+  transition: transform 0.15s;
+}
+
+.tactical-switch:checked {
+  background: rgba(34, 197, 94, 0.5);
+}
+
+.tactical-switch:checked::after {
+  transform: translateX(16px);
+  background: #22ff88;
+  box-shadow: 0 0 8px #22ff88;
+}
+
+/* Subtle CRT scanline overlay used in CRT post-fx mode */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.18) 0px,
+    rgba(0, 0, 0, 0.18) 1px,
+    transparent 2px,
+    transparent 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+.crt-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* Night-vision green tint overlay */
+.nv-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 49;
+  background: rgba(0, 80, 0, 0.28);
+  mix-blend-mode: screen;
+}
+
+.nv-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
