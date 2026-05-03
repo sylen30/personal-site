@@ -39,7 +39,7 @@ export default {
       try {
         const upstream = await fetch(url, {
           headers: { 'User-Agent': 'WorldView/1.0 (+https://github.com/sylen30/personal-site)' },
-          signal: AbortSignal.timeout(8_000),
+          cf: { cacheTtl: 0 },
         });
         if (!upstream.ok) continue;
 
