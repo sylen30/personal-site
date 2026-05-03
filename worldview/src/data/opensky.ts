@@ -6,12 +6,12 @@ import type { Aircraft } from '../types';
 // (all public ADS-B APIs block CORS from github.io).
 const PROXY_URL = (import.meta.env.VITE_FLIGHTS_PROXY_URL as string | undefined)?.replace(/\/$/, '');
 
+// In local dev (npm run dev) Vite proxies /api/flights → adsb.lol server-side,
+// so the browser never makes a cross-origin request. On static hosts (GH Pages)
+// VITE_FLIGHTS_PROXY_URL must point to the deployed Cloudflare Worker.
 const SOURCES: string[] = PROXY_URL
   ? [PROXY_URL]
-  : [
-      'https://api.adsb.lol/v2/aircraft',
-      'https://opendata.adsb.fi/api/v2/snapshot',
-    ];
+  : ['/api/flights'];
 
 interface AircraftRecord {
   hex: string;
@@ -68,10 +68,9 @@ export async function fetchAircraftStates(): Promise<Aircraft[]> {
       // network / CORS / timeout — try next source
     }
   }
+  console.warn('[flights] All sources failed — returning last known state.');
   if (!PROXY_URL) {
-    console.warn('[flights] No VITE_FLIGHTS_PROXY_URL set — direct API calls are CORS-blocked on github.io. Deploy the Cloudflare Worker in worldview/flights-proxy/ and set the env var.');
-  } else {
-    console.warn('[flights] Proxy fetch failed, returning last known state');
+    console.warn('[flights] Tip: for static hosts set VITE_FLIGHTS_PROXY_URL to your Cloudflare Worker URL (worldview/flights-proxy/).');
   }
   return lastResult;
 }

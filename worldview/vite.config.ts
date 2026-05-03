@@ -24,5 +24,13 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    proxy: {
+      // Forward /api/flights to adsb.lol server-side → no CORS in local dev.
+      '/api/flights': {
+        target: 'https://api.adsb.lol',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/flights/, '/v2/aircraft'),
+      },
+    },
   },
 });
